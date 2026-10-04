@@ -1,8 +1,12 @@
 # ESP32 chess clock
 
-A stand-alone two-player chess clock on the **Waveshare ESP32-S3-Touch-AMOLED-1.8 (V2: CO5300
-panel)**. No Mac, no Wi-Fi, no cloud: power it from USB (a power bank is fine), lay it flat between
-the players, and play. The top half of the screen is drawn upside down for the player across the table.
+A stand-alone two-player chess clock for the **Waveshare ESP32-S3-Touch-AMOLED-1.8, V2 revision**
+(CO5300 panel; see [Hardware](#hardware) for what it does and doesn't work with). No Mac, no Wi-Fi, no
+cloud once it is flashed: power it over USB-C, lay it flat between the players, and play. The top half of the
+screen is drawn upside down for the player across the table.
+
+Tested powered from a Mac. A USB charger or power bank should also work but is untested, and the firmware
+never touches the battery/power-management chip.
 
 ```
 tools/board.sh test      # unit-test the clock logic on the Mac (no board needed)
@@ -10,10 +14,44 @@ tools/board.sh flash     # build + flash the firmware onto the board
 tools/board.sh ticker    # switch the board to a sibling project (see Revert / erase)
 ```
 
-Built and tested on the Waveshare **V2** revision (CO5300 AMOLED, CST820 touch, 16 MB flash, 8 MB PSRAM).
-The original revision uses a different display driver (SH8601) and touch chip and will not work unmodified.
+## Hardware
 
-## Setup (first time, macOS/Linux)
+**Works with (tested):** the **Waveshare ESP32-S3-Touch-AMOLED-1.8, V2 revision**: 1.8" 368x448 QSPI
+AMOLED with a **CO5300** controller, **CST820** touch, 16 MB flash, 8 MB octal PSRAM. One board has been
+tested; nothing else has.
+
+**Not supported:**
+
+| Hardware | Why |
+|---|---|
+| Waveshare's **original** revision of the same board (SH8601 display, FT3168 touch) | Different display controller and touch chip (Waveshare's FT3168 driver uses I2C address 0x38; this firmware drives a CO5300 and looks for touch at 0x15). Expect a blank or garbled screen and no touch. Untested; the pins are the same, the chips are not. |
+| Any other ESP32 board or display | The code is written for this board's pins and chips. Porting needs a 368x448 QSPI panel with a driver in Arduino_GFX, a touch driver, and **PSRAM**: the full-frame buffer is 330 KB, more than the ESP32-S3's internal RAM can spare. |
+
+**How to tell which revision you have.** Waveshare's docs don't give a physical marking, so check the chips:
+
+- Flash this firmware, then run `tools/board.sh ctl "boot"`. A V2 board prints `expander ok` and
+  `touch ok id=0xB7`; `touch NOT FOUND` means a different touch chip (likely the original revision).
+- Or, from a backup of the factory firmware: `strings backup/original_flash_*.bin | grep -E "CO5300|SH8601"`.
+  A V2 image contains `CO5300` and no `SH8601` (this is how the tested board was identified).
+
+**What the firmware uses on the board** (pins match Waveshare's V2 `pin_config.h`):
+
+| Part | Connection |
+|---|---|
+| Display (CO5300, QSPI, column offset 16) | SDIO0-3 = GPIO 4, 5, 6, 7; SCLK = GPIO 11; CS = GPIO 12 |
+| Touch (CST820) | I2C address 0x15 on SDA = GPIO 15, SCL = GPIO 14 |
+| I/O expander (TCA9554) | I2C address 0x20; pins 0-2 pulsed low then high at boot to reset the display and touch chip |
+| PSRAM | 8 MB octal; holds the frame buffer |
+| USB-C | native USB-Serial/JTAG (USB ID 303A:1001): flashing and the test commands |
+
+Not used: IMU, RTC, power-management chip (so battery behaviour is untested), audio codec/speaker,
+microSD.
+
+**Host computer** (only needed to build and flash): tested on macOS with Python 3.12. Linux is likely to work
+but is untested; Windows is not supported (`tools/board.sh` is a bash script). The build is pinned to
+Arduino-ESP32 3.3.11 (pioarduino platform 55.03.311), the version Waveshare tests its V2 examples against.
+
+## Setup (first time)
 
 Needs `uv` (or any Python 3.12), a C++ compiler (`c++`, for the host tests) and the board on USB-C.
 
@@ -102,8 +140,8 @@ can hold the port: kill a running `ctl ... log` before flashing.
 
 ## Gotchas learned the hard way
 
-- **The touch panel reports a window of the picture, not all of it.** The CST820's raw 0..367 x 0..447
-  covers screen x 33..329, y 31..397 and is clamped at the ends, so the outer 30-50 px read as the extreme
+- **The touch panel reports a window of the picture, not all of it.** On the tested board the CST820's raw
+  0..367 x 0..447 covers screen x 33..329, y 31..397 and is clamped at the ends, so the outer 30-50 px read as the extreme
   value. `main.cpp` maps raw to screen with a fitted scale and offset (`TOUCH_SCALE_*`, `TOUCH_OFF_*`,
   from two runs of the `CAL` screen, ~9 px rms). Touch targets are therefore big; a precise button near
   the very edge can't be resolved. Re-run `CAL` if you change panels.
