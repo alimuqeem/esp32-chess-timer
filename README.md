@@ -127,6 +127,11 @@ lib/ src/fonts/    vendored Arduino_GFX 1.6.4 (CO5300 driver) and GFX fonts
 .platformio/       toolchain PlatformIO downloads on first build (gitignored)
 ```
 
+## Licence
+
+The code in this repo (`src/clock.h`, `src/main.cpp`, `tests/`, `tools/`) is MIT licensed; see `LICENSE`.
+The third-party code below keeps its own licence.
+
 ## Third-party code
 
 - `lib/GFX_Library_for_Arduino/`: GFX Library for Arduino 1.6.4 (by moononournation, BSD licence, includes
