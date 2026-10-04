@@ -1,0 +1,8 @@
+.venv/
+.pio-venv/
+.pio/
+.platformio/
+__pycache__/
+backup/
+state/
+firmware/*.bin
